@@ -1,8 +1,9 @@
+from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
 from flask_restx import Api
 
-from controller import voice_idetification_ns
+from controller.voice_idetification import voice_identification_ns
 
 app = Flask(__name__)
 CORS(app=app, resources={ r"/api/": { "origins": "*" } })
@@ -13,7 +14,8 @@ api = Api(app, doc='/swagger-ui')
 def hello():
     return "Hello World"
 
-api.add_namespace(voice_idetification_ns, '/team85/api/voice-idetification')
+api.add_namespace(voice_identification_ns, '/team85/api/voice-idetification')
 
 if __name__ == '__main__':
-    app.run()
+    load_dotenv()
+    app.run(debug=True)
