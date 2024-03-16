@@ -58,3 +58,8 @@ class VoiceIdentification(Resource):
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
         except Exception as err:
             return Response(json.dumps(err.args, default=lambda obj: obj.__dict__), mimetype=self.mimeType) 
+
+# Function to estimate background noise level
+# def estimate_background_noise_level(audio_file):
+#     y, sr = librosa.load(audio_file)
+#     return np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=y), ref=np.max))

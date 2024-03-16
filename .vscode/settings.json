@@ -29,5 +29,7 @@
         "env.bak{,/**}",
         "venv.bak{,/**}",
         ".vscode{,/**}"
-    ]
+    ],
+    "appService.defaultWebAppToDeploy": "/subscriptions/d91e487f-3189-483a-8e54-f0d7177ba4f6/resourceGroups/Team-85/providers/Microsoft.Web/sites/GanapatiWebApp",
+    "appService.deploySubpath": "."
 }
