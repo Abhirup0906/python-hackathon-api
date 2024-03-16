@@ -25,8 +25,7 @@ def extract_features(file: FileStorage):
     chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
     mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
     contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
-    tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x),
-    sr=sample_rate).T,axis=0)
+    tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)
         
     features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz), axis=0))
     return features
@@ -34,7 +33,7 @@ def extract_features(file: FileStorage):
 @voice_identification_ns.route('/')
 class VoiceIdentification(Resource):
     mimeType: str = 'application/json'    
-    path = os.path.join(os.path.abspath('model')+'\\'+'team85-voice-recognition.pkl')
+    path = os.path.join(os.path.abspath('model')+'/'+'team85-voice-recognition.pkl')
     pickeled_model = pickle.load(open(path, 'rb'))
     
     @voice_identification_ns.expect(voice_identification_parser)
