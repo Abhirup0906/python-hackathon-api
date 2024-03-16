@@ -17,5 +17,5 @@ def hello():
 api.add_namespace(voice_identification_ns, '/team85/api/voice-idetification')
 
 if __name__ == '__main__':
-    load_dotenv()
-    app.run(debug=True)
+    #load_dotenv()
+    app.run()
