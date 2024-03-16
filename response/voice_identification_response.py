@@ -11,7 +11,7 @@ class ConfidenceScore(BaseModel):
 
 class AdditionalInfo(BaseModel):
     emotionalTone: str = ''
-    backgroundNoiseLevel: str = ''
+    backgroundNoiseLevel: float = 0.0
 
 class VoiceIdentificationResponse(BaseModel): 
     status: str

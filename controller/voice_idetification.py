@@ -9,32 +9,43 @@ import librosa
 import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
 
-from response.voice_identification_response import AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
+from response.voice_identification_response import AdditionalInfo, AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
 
 voice_identification_ns = Namespace("Voice Identification related API", description="Voice Identification related API")
 
 voice_identification_parser = voice_identification_ns.parser()
 voice_identification_parser.add_argument('file', location='files', type=FileStorage, required = True)
 
-def extract_features(file: FileStorage):
-    features: list[float] = []
-    
-    x, sample_rate = librosa.load(file, res_type='kaiser_fast')
-    mfccs = np.mean(librosa.feature.mfcc(y=x, sr=sample_rate, n_mfcc=40).T, axis=0)    
-    stft = np.abs(librosa.stft(x))    
-    chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
-    mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
-    contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
-    tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)
-        
-    features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz), axis=0))
-    return features
+
 
 @voice_identification_ns.route('/')
 class VoiceIdentification(Resource):
     mimeType: str = 'application/json'    
     path = os.path.join(os.path.abspath('model')+'/'+'team85-voice-recognition.pkl')
     pickeled_model = pickle.load(open(path, 'rb'))
+    Xdb: float = 0.0
+
+    def extract_features(self, file: FileStorage):
+        features: list[float] = []
+        
+        x, sample_rate = librosa.load(file, res_type='kaiser_fast')
+        mfccs = np.mean(librosa.feature.mfcc(y=x, sr=sample_rate, n_mfcc=40).T, axis=0)    
+        stft = np.abs(librosa.stft(x))    
+        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
+        mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
+        contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
+        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)        
+        spect_flatness = np.mean(librosa.feature.spectral_flatness(S=stft).T, axis=0)    
+        spect_bandwidth = np.mean(librosa.feature.spectral_bandwidth(S=stft, sr=sample_rate).T, axis=0)
+            
+        features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz, spect_bandwidth, spect_flatness), axis=0))   
+
+        self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))
+
+        if self.Xdb < 0: 
+            self.Xdb = self.Xdb * -1
+
+        return features
     
     @voice_identification_ns.expect(voice_identification_parser)
     def post(self) -> Response:
@@ -44,7 +55,7 @@ class VoiceIdentification(Resource):
             result: VoiceIdentificationResponse = VoiceIdentificationResponse(status='success')
             args = voice_identification_parser.parse_args()
             file: FileStorage = args['file']            
-            features = np.array(extract_features(file=file))
+            features = np.array(self.extract_features(file=file))
             ss = StandardScaler()
             x_test = ss.fit_transform(features)
             response = self.pickeled_model.predict_proba(x_test)[0]            
@@ -54,12 +65,8 @@ class VoiceIdentification(Resource):
                 voiceType = 'ai'
             result.analysis = AnalysisResult(detectedVoice= response[1]> response[0], voiceType=voiceType)
             result.confidenceScore = ConfidenceScore(aiProbability= response[0] * 100, humanProbability= response[1] * 100)
+            result.AdditionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
         except Exception as err:
             return Response(json.dumps(err.args, default=lambda obj: obj.__dict__), mimetype=self.mimeType) 
-
-# Function to estimate background noise level
-# def estimate_background_noise_level(audio_file):
-#     y, sr = librosa.load(audio_file)
-#     return np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=y), ref=np.max))
