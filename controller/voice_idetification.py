@@ -8,10 +8,6 @@ import os
 import librosa
 import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
-from azure.core.credentials import AzureKeyCredential
-import speech_recognition as sr
-from azure.ai.textanalytics import TextAnalyticsClient
-import azure.cognitiveservices.speech as speechsdk
 
 
 from response.voice_identification_response import AdditionalInfo, AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
