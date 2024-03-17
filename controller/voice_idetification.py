@@ -1,6 +1,6 @@
 import time
 from flask import Response
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource
 from werkzeug.datastructures import FileStorage
 import json
 import pickle
@@ -8,6 +8,11 @@ import os
 import librosa
 import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
+from azure.core.credentials import AzureKeyCredential
+import speech_recognition as sr
+from azure.ai.textanalytics import TextAnalyticsClient
+import azure.cognitiveservices.speech as speechsdk
+
 
 from response.voice_identification_response import AdditionalInfo, AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
 
@@ -42,16 +47,58 @@ class VoiceIdentification(Resource):
 
         self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))
 
-        if self.Xdb < 0: 
-            self.Xdb = self.Xdb * -1
+        # if self.Xdb < 0: 
+        #     self.Xdb = self.Xdb * -1
+
+        # speech_config = speechsdk.SpeechConfig(subscription='48ba41bd7c7b43338664e5639ca30e05', region='eastus')       
+
+        # audio_config = speechsdk.audio.AudioConfig(stream=PushAudioInputStream)
+        # speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+
+        # print("Speak into your microphone.")
+        # speech_recognition_result = speech_recognizer.recognize_once_async().get()
+            
+        # r = sr.Recognizer()        
+        # with sr.AudioData(file, sample_rate=sample_rate, sample_width=1) as source:
+        #     # listen for the data (load audio to memory)
+        #     audio_data = r.record(source)
+        #     # recognize (convert from speech to text)
+        #     text = r.recognize_google(audio_data)
+        #     print(text)
+        #     return text
 
         return features
+    
+    # def SpeakText(self, audio_file: FileStorage) -> str:
+    #     # Initialize the recognizer 
+    #     r = sr.Recognizer() 
+    #     x, sample_rate = librosa.load(audio_file, res_type='kaiser_fast')
+    #     # MyText = r.recognize_google(audio_file)
+    #     # MyText = MyText.lower()
+    #     # open the file
+    #     with sr.AudioData(audio_file, sample_rate=sample_rate) as source:
+    #         # listen for the data (load audio to memory)
+    #         audio_data = r.record(source)
+    #         # recognize (convert from speech to text)
+    #         text = r.recognize_google(audio_data)
+    #         print(text)
+    #         return text
+    
+    
+    # def analyze_emotion_tone(text):
+    #     key = "d4fab660ad334dbb964214e57082dc54"
+    #     endpoint = "https://team85languageservice.cognitiveservices.azure.com/"
+    #     credential = AzureKeyCredential(key)
+    #     text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=credential)
+    #     response = text_analytics_client.analyze_sentiment(documents=[text],show_opinion_mining=True, show_stats=True)[0]
+    #     return response.sentiment, response.confidence_scores
+
     
     @voice_identification_ns.expect(voice_identification_parser)
     def post(self) -> Response:
         try:
             startTime = time.perf_counter()
-            voiceType: str = ''
+            voiceType: str = ''            
             result: VoiceIdentificationResponse = VoiceIdentificationResponse(status='success')
             args = voice_identification_parser.parse_args()
             file: FileStorage = args['file']            
@@ -63,9 +110,10 @@ class VoiceIdentification(Resource):
                 voiceType = 'human'
             else:
                 voiceType = 'ai'
+            #text = self.SpeakText(file)
             result.analysis = AnalysisResult(detectedVoice= response[1]> response[0], voiceType=voiceType)
             result.confidenceScore = ConfidenceScore(aiProbability= response[0] * 100, humanProbability= response[1] * 100)
-            result.AdditionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb)
+            result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
         except Exception as err:

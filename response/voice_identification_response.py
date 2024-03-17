@@ -17,5 +17,5 @@ class VoiceIdentificationResponse(BaseModel):
     status: str
     analysis: AnalysisResult = None
     confidenceScore: ConfidenceScore = None
-    AdditionalInfo: AdditionalInfo = None
+    additionalInfo: AdditionalInfo = None
     responseTime: int = 0
