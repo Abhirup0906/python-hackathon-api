@@ -8,7 +8,7 @@ import os
 import librosa
 import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
-
+import speech_recognition as sr
 
 from response.voice_identification_response import AdditionalInfo, AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
 
@@ -53,15 +53,16 @@ class VoiceIdentification(Resource):
 
         # print("Speak into your microphone.")
         # speech_recognition_result = speech_recognizer.recognize_once_async().get()
-            
-        # r = sr.Recognizer()        
-        # with sr.AudioData(file, sample_rate=sample_rate, sample_width=1) as source:
-        #     # listen for the data (load audio to memory)
-        #     audio_data = r.record(source)
-        #     # recognize (convert from speech to text)
-        #     text = r.recognize_google(audio_data)
-        #     print(text)
-        #     return text
+        save_path=os.path.join(os.path.abspath('model')+'/'+file.filename)
+        file.stream.seek(0)
+        file.save(save_path)
+        r = sr.Recognizer()        
+        with sr.AudioFile(save_path) as source:
+            # listen for the data (load audio to memory)
+            audio_data = r.record(source)
+            # recognize (convert from speech to text)
+            text = r.recognize_google(audio_data)
+            print(text)           
 
         return features
     
