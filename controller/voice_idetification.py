@@ -29,6 +29,7 @@ class VoiceIdentification(Resource):
     pickeled_model = pickle.load(open(path, 'rb'))
     Xdb: float = 0.0
     emotion: str = ''
+    language: str = ''
 
     def extract_features(self, file: FileStorage):
         features: list[float] = []
@@ -73,8 +74,14 @@ class VoiceIdentification(Resource):
         if len(responses) > 0:
             self.emotion = responses[0].sentiment
         else :
-            self.emotion = ''
-    
+            self.emotion = ''        
+        
+        response_language = text_analytics_client.detect_language(documents = [text])
+        if len(response_language) > 0:
+            self.language = response_language[0].primary_language.name
+        else:
+            self.language = ''
+
     @voice_identification_ns.expect(voice_identification_parser)
     def post(self) -> Response:
         try:
@@ -92,10 +99,10 @@ class VoiceIdentification(Resource):
             else:
                 voiceType = 'ai'
             file.stream.seek(0)
-            text = self.SpeakText(file)
+            self.SpeakText(file)
             result.analysis = AnalysisResult(detectedVoice= response[1]> response[0], voiceType=voiceType)
             result.confidenceScore = ConfidenceScore(aiProbability= response[0] * 100, humanProbability= response[1] * 100)
-            result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb, emotionalTone=self.emotion)
+            result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb, emotionalTone=self.emotion, language=self.language)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
         except Exception as err:
