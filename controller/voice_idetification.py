@@ -31,6 +31,10 @@ class VoiceIdentification(Resource):
     emotion: str = ''
     language: str = ''
 
+    """
+        This method is used to process the audio file and extract the featres out it. 
+        Extarct audio feature like mfcc, stft, chroma, mel etc.
+    """
     def extract_features(self, file: FileStorage):
         features: list[float] = []
         
@@ -40,16 +44,16 @@ class VoiceIdentification(Resource):
         chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
         mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
         contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
-        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)        
-        spect_flatness = np.mean(librosa.feature.spectral_flatness(S=stft).T, axis=0)    
-        spect_bandwidth = np.mean(librosa.feature.spectral_bandwidth(S=stft, sr=sample_rate).T, axis=0)
-            
-        features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz, spect_bandwidth, spect_flatness), axis=0))   
+        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)             
+        features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz), axis=0))   
 
         self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))     
 
         return features
     
+    """
+        This method used to convert the speech into text. 
+    """
     def SpeakText(self, file: FileStorage):
         if(file.filename.lower().find('.wav') != -1):
             save_path=os.path.join(os.path.abspath('model')+'/'+uuid.uuid4().hex + '.wav')
@@ -64,7 +68,9 @@ class VoiceIdentification(Resource):
                 self.analyze_emotion_tone(text=text)
             os.remove(save_path)
     
-    
+    """
+        After gettingthe text out of the wav file. It uses cognitive services to find language and setiment.
+    """
     def analyze_emotion_tone(self, text: str):
         key = os.environ['COGNITIVE_TEXT_ANALYTICS_KEY']
         endpoint = os.environ['COGNITIVE_TEXT_ANALYTICS_ENDPOINT']
@@ -82,6 +88,9 @@ class VoiceIdentification(Resource):
         else:
             self.language = ''
 
+    """
+        This is the post request where we receive the file and process the output.
+    """
     @voice_identification_ns.expect(voice_identification_parser)
     def post(self) -> Response:
         try:
@@ -93,15 +102,15 @@ class VoiceIdentification(Resource):
             features = np.array(self.extract_features(file=file))
             ss = StandardScaler()
             x_test = ss.fit_transform(features)
-            response = self.pickeled_model.predict_proba(x_test)[0]            
-            if(response[1]> response[0]) :
+            model_output = self.pickeled_model.predict_proba(x_test)[0]            
+            if(model_output[1]> model_output[0]) :
                 voiceType = 'human'
             else:
                 voiceType = 'ai'
             file.stream.seek(0)
             self.SpeakText(file)
-            result.analysis = AnalysisResult(detectedVoice= response[1]> response[0], voiceType=voiceType)
-            result.confidenceScore = ConfidenceScore(aiProbability= response[0] * 100, humanProbability= response[1] * 100)
+            result.analysis = AnalysisResult(detectedVoice= model_output[1]> model_output[0], voiceType=voiceType)
+            result.confidenceScore = ConfidenceScore(aiProbability= model_output[0] * 100, humanProbability= model_output[1] * 100)
             result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb, emotionalTone=self.emotion, language=self.language)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
