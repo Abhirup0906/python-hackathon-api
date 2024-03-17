@@ -49,7 +49,7 @@ class VoiceIdentification(Resource):
 
         return features
     
-    def SpeakText(self, file: FileStorage) -> str:
+    def SpeakText(self, file: FileStorage):
         if(file.filename.lower().find('.wav') != -1):
             save_path=os.path.join(os.path.abspath('model')+'/'+uuid.uuid4().hex + '.wav')
             file.stream.seek(0)
@@ -65,8 +65,8 @@ class VoiceIdentification(Resource):
     
     
     def analyze_emotion_tone(self, text: str):
-        key = os.environ['COGNITIVE_SPEECH_SERVICES_KEY']
-        endpoint = os.environ['COGNITIVE_SPEECH_SERVICES_ENDPOINT']
+        key = os.environ['COGNITIVE_TEXT_ANALYTICS_KEY']
+        endpoint = os.environ['COGNITIVE_TEXT_ANALYTICS_ENDPOINT']
         credential = AzureKeyCredential(key)
         text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=credential)
         responses = text_analytics_client.analyze_sentiment(documents=[text],show_opinion_mining=True, show_stats=True)
