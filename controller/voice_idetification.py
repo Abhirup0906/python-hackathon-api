@@ -9,6 +9,9 @@ import librosa
 import numpy as np
 from sklearn.discriminant_analysis import StandardScaler
 import speech_recognition as sr
+from azure.ai.textanalytics import TextAnalyticsClient
+from azure.core.credentials import AzureKeyCredential
+import uuid
 
 from response.voice_identification_response import AdditionalInfo, AnalysisResult, ConfidenceScore, VoiceIdentificationResponse
 
@@ -25,6 +28,7 @@ class VoiceIdentification(Resource):
     path = os.path.join(os.path.abspath('model')+'/'+'team85-voice-recognition.pkl')
     pickeled_model = pickle.load(open(path, 'rb'))
     Xdb: float = 0.0
+    emotion: str = ''
 
     def extract_features(self, file: FileStorage):
         features: list[float] = []
@@ -41,55 +45,35 @@ class VoiceIdentification(Resource):
             
         features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz, spect_bandwidth, spect_flatness), axis=0))   
 
-        self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))
-
-        # if self.Xdb < 0: 
-        #     self.Xdb = self.Xdb * -1
-
-        # speech_config = speechsdk.SpeechConfig(subscription='48ba41bd7c7b43338664e5639ca30e05', region='eastus')       
-
-        # audio_config = speechsdk.audio.AudioConfig(stream=PushAudioInputStream)
-        # speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-
-        # print("Speak into your microphone.")
-        # speech_recognition_result = speech_recognizer.recognize_once_async().get()
-        save_path=os.path.join(os.path.abspath('model')+'/'+file.filename)
-        file.stream.seek(0)
-        file.save(save_path)
-        r = sr.Recognizer()        
-        with sr.AudioFile(save_path) as source:
-            # listen for the data (load audio to memory)
-            audio_data = r.record(source)
-            # recognize (convert from speech to text)
-            text = r.recognize_google(audio_data)
-            print(text)           
+        self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))     
 
         return features
     
-    # def SpeakText(self, audio_file: FileStorage) -> str:
-    #     # Initialize the recognizer 
-    #     r = sr.Recognizer() 
-    #     x, sample_rate = librosa.load(audio_file, res_type='kaiser_fast')
-    #     # MyText = r.recognize_google(audio_file)
-    #     # MyText = MyText.lower()
-    #     # open the file
-    #     with sr.AudioData(audio_file, sample_rate=sample_rate) as source:
-    #         # listen for the data (load audio to memory)
-    #         audio_data = r.record(source)
-    #         # recognize (convert from speech to text)
-    #         text = r.recognize_google(audio_data)
-    #         print(text)
-    #         return text
+    def SpeakText(self, file: FileStorage) -> str:
+        if(file.filename.lower().find('.wav') != -1):
+            save_path=os.path.join(os.path.abspath('model')+'/'+uuid.uuid4().hex + '.wav')
+            file.stream.seek(0)
+            file.save(save_path)
+            r = sr.Recognizer()        
+            with sr.AudioFile(save_path) as source:
+                # listen for the data (load audio to memory)
+                audio_data = r.record(source)
+                # recognize (convert from speech to text)
+                text = r.recognize_google(audio_data)
+                self.analyze_emotion_tone(text=text)
+            os.remove(save_path)
     
     
-    # def analyze_emotion_tone(text):
-    #     key = "d4fab660ad334dbb964214e57082dc54"
-    #     endpoint = "https://team85languageservice.cognitiveservices.azure.com/"
-    #     credential = AzureKeyCredential(key)
-    #     text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=credential)
-    #     response = text_analytics_client.analyze_sentiment(documents=[text],show_opinion_mining=True, show_stats=True)[0]
-    #     return response.sentiment, response.confidence_scores
-
+    def analyze_emotion_tone(self, text: str):
+        key = os.environ['COGNITIVE_SPEECH_SERVICES_KEY']
+        endpoint = os.environ['COGNITIVE_SPEECH_SERVICES_ENDPOINT']
+        credential = AzureKeyCredential(key)
+        text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=credential)
+        responses = text_analytics_client.analyze_sentiment(documents=[text],show_opinion_mining=True, show_stats=True)
+        if len(responses) > 0:
+            self.emotion = responses[0].sentiment
+        else :
+            self.emotion = ''
     
     @voice_identification_ns.expect(voice_identification_parser)
     def post(self) -> Response:
@@ -107,10 +91,11 @@ class VoiceIdentification(Resource):
                 voiceType = 'human'
             else:
                 voiceType = 'ai'
-            #text = self.SpeakText(file)
+            file.stream.seek(0)
+            text = self.SpeakText(file)
             result.analysis = AnalysisResult(detectedVoice= response[1]> response[0], voiceType=voiceType)
             result.confidenceScore = ConfidenceScore(aiProbability= response[0] * 100, humanProbability= response[1] * 100)
-            result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb)
+            result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb, emotionalTone=self.emotion)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
         except Exception as err:
