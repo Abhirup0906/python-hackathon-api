@@ -40,12 +40,13 @@ class VoiceIdentification(Resource):
         
         x, sample_rate = librosa.load(file, res_type='kaiser_fast')
         mfccs = np.mean(librosa.feature.mfcc(y=x, sr=sample_rate, n_mfcc=40).T, axis=0)    
-        stft = np.abs(librosa.stft(x))    
-        chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
-        mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
-        contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
-        tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)             
-        features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz), axis=0))   
+        # stft = np.abs(librosa.stft(x))    
+        # chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)    
+        # mel = np.mean(librosa.feature.melspectrogram(y=x, sr=sample_rate).T,axis=0)    
+        # contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)    
+        # tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate).T,axis=0)             
+        #features.append(np.concatenate((mfccs, chroma, mel, contrast, tonnetz), axis=0))   
+        features.append(mfccs)
 
         self.Xdb = np.mean(librosa.amplitude_to_db(librosa.feature.rms(y=x), ref=np.max))     
 
@@ -100,17 +101,18 @@ class VoiceIdentification(Resource):
             args = voice_identification_parser.parse_args()
             file: FileStorage = args['file']            
             features = np.array(self.extract_features(file=file))
-            ss = StandardScaler()
-            x_test = ss.fit_transform(features)
-            model_output = self.pickeled_model.predict_proba(x_test)[0]            
-            if(model_output[1]> model_output[0]) :
+            # ss = StandardScaler()
+            # x_test = ss.fit_transform(features)
+            selection =  self.pickeled_model.predict(features)
+            model_output = self.pickeled_model.predict_proba(features)[0]            
+            if(selection[0] == 0) :
                 voiceType = 'human'
             else:
                 voiceType = 'ai'
             file.stream.seek(0)
             self.SpeakText(file)
-            result.analysis = AnalysisResult(detectedVoice= model_output[1]> model_output[0], voiceType=voiceType)
-            result.confidenceScore = ConfidenceScore(aiProbability= model_output[0] * 100, humanProbability= model_output[1] * 100)
+            result.analysis = AnalysisResult(detectedVoice= selection[0] == 0, voiceType=voiceType)
+            result.confidenceScore = ConfidenceScore(aiProbability= model_output[1] * 100, humanProbability= model_output[0] * 100)
             result.additionalInfo = AdditionalInfo(backgroundNoiseLevel=self.Xdb, emotionalTone=self.emotion, language=self.language)
             result.responseTime = time.perf_counter() - startTime
             return Response(json.dumps(result, default=lambda obj: obj.__dict__), mimetype=self.mimeType)
