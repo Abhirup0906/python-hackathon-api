@@ -14,7 +14,7 @@ api = Api(app, doc='/swagger-ui')
 def hello():
     return "Team Cyber Warrior Hackthon 2024 has been started"
 
-api.add_namespace(voice_identification_ns, '/ping')
+api.add_namespace(voice_identification_ns, '/voice/analyze')
 
 if __name__ == '__main__':
     load_dotenv()
