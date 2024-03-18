@@ -12,10 +12,10 @@ api = Api(app, doc='/swagger-ui')
 
 @app.route('/')
 def hello():
-    return "Hello World"
+    return "Team Cyber Warrior Hackthon 2024 has been started"
 
-api.add_namespace(voice_identification_ns, '/team85/api/voice-idetification')
+api.add_namespace(voice_identification_ns, '/ping')
 
 if __name__ == '__main__':
-    #load_dotenv()
-    app.run()
+    load_dotenv()
+    app.run(debug=False)
