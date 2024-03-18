@@ -79,7 +79,12 @@ class VoiceIdentification(Resource):
         text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=credential)
         responses = text_analytics_client.analyze_sentiment(documents=[text],show_opinion_mining=True, show_stats=True)
         if len(responses) > 0:
-            self.emotion = responses[0].sentiment
+            if responses[0].sentiment == 'positive':
+                self.emotion = 'happy'
+            elif responses[0].sentiment == 'negative':
+                self.emotion = 'angry'            
+            else:
+                self.emotion = responses[0].sentiment
         else :
             self.emotion = ''        
         
